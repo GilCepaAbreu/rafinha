@@ -57,53 +57,165 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // --- Lógica do Carrossel de Vídeos ---
-    const track = document.querySelector('.carousel-track');
-    const slides = Array.from(track.children);
-    const nextButton = document.querySelector('.carousel-button.next');
-    const prevButton = document.querySelector('.carousel-button.prev');
-    const dotsNav = document.querySelector('.carousel-dots');
-    const dots = Array.from(dotsNav.children);
+    // --- Lógica da Galeria Dinâmica com Lightbox ---
+    const galleryContainer = document.getElementById('dynamicGallery');
+    
+    // Configuração do Lightbox
+    const lightbox = document.getElementById('lightbox');
+    const lightboxContent = document.getElementById('lightboxContent');
+    const lightboxClose = document.getElementById('lightboxClose');
+    const lightboxNext = document.getElementById('lightboxNext');
+    const lightboxPrev = document.getElementById('lightboxPrev');
+    let currentLightboxIndex = -1;
 
-    let currentSlideIndex = 0;
-
-    const moveToSlide = (index) => {
-        const slideWidth = slides[0].getBoundingClientRect().width;
-        track.style.transform = 'translateX(-' + slideWidth * index + 'px)';
+    const openLightbox = (index) => {
+        currentLightboxIndex = index;
+        const ficheiro = galeriaFicheiros[index];
+        const extensao = ficheiro.split('.').pop().toLowerCase();
+        const caminho = `galeria/${ficheiro}`;
         
-        // Atualizar dots
-        dots.forEach(dot => dot.classList.remove('active'));
-        dots[index].classList.add('active');
+        lightboxContent.innerHTML = ''; 
         
-        currentSlideIndex = index;
+        if (['mp4', 'webm', 'ogg'].includes(extensao)) {
+            lightboxContent.innerHTML = `<video controls autoplay><source src="${caminho}" type="video/${extensao}"></video>`;
+        } else {
+            lightboxContent.innerHTML = `<img src="${caminho}">`;
+        }
+        
+        lightbox.classList.add('active');
+        document.body.style.overflow = 'hidden'; 
     };
 
-    nextButton.addEventListener('click', () => {
-        if (currentSlideIndex === slides.length - 1) {
-            moveToSlide(0); // Voltar ao início
-        } else {
-            moveToSlide(currentSlideIndex + 1);
-        }
-    });
+    const closeLightbox = () => {
+        lightbox.classList.remove('active');
+        lightboxContent.innerHTML = '';
+        document.body.style.overflow = '';
+    };
 
-    prevButton.addEventListener('click', () => {
-        if (currentSlideIndex === 0) {
-            moveToSlide(slides.length - 1); // Ir para o fim
+    const nextMedia = () => {
+        if (currentLightboxIndex < galeriaFicheiros.length - 1) {
+            openLightbox(currentLightboxIndex + 1);
         } else {
-            moveToSlide(currentSlideIndex - 1);
+            openLightbox(0);
         }
-    });
+    };
 
-    dotsNav.addEventListener('click', e => {
-        const targetDot = e.target.closest('button');
-        if (!targetDot) return;
+    const prevMedia = () => {
+        if (currentLightboxIndex > 0) {
+            openLightbox(currentLightboxIndex - 1);
+        } else {
+            openLightbox(galeriaFicheiros.length - 1);
+        }
+    };
+
+    if (lightbox) {
+        lightboxClose.addEventListener('click', closeLightbox);
+        lightboxNext.addEventListener('click', nextMedia);
+        lightboxPrev.addEventListener('click', prevMedia);
         
-        const targetIndex = dots.findIndex(dot => dot === targetDot);
-        moveToSlide(targetIndex);
-    });
+        lightbox.addEventListener('click', (e) => {
+            if(e.target === lightbox) closeLightbox();
+        });
 
-    // Recalcular quando a janela é redimensionada
-    window.addEventListener('resize', () => {
-        moveToSlide(currentSlideIndex);
-    });
+        document.addEventListener('keydown', (e) => {
+            if (!lightbox.classList.contains('active')) return;
+            if (e.key === 'Escape') closeLightbox();
+            if (e.key === 'ArrowRight') nextMedia();
+            if (e.key === 'ArrowLeft') prevMedia();
+        });
+    }
+
+    // --- Lógica de Paginação da Galeria ---
+    const itemsPerPageSelect = document.getElementById('itemsPerPage');
+    const prevPageBtn = document.getElementById('prevPage');
+    const nextPageBtn = document.getElementById('nextPage');
+    const pageInfo = document.getElementById('pageInfo');
+    
+    let currentPage = 1;
+    let itemsPerPage = 20;
+
+    const renderGallery = () => {
+        if (!galleryContainer || typeof galeriaFicheiros === 'undefined') return;
+        
+        galleryContainer.innerHTML = ''; 
+        
+        if (galeriaFicheiros.length === 0) {
+            galleryContainer.innerHTML = '<p style="text-align:center; grid-column: 1 / -1; color: var(--text-secondary);">Não há ficheiros na galeria.</p>';
+            if (pageInfo) pageInfo.textContent = 'Página 0 de 0';
+            return;
+        }
+
+        const totalPages = Math.ceil(galeriaFicheiros.length / itemsPerPage);
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+        
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        const currentItems = galeriaFicheiros.slice(startIndex, endIndex);
+        
+        currentItems.forEach((ficheiro, loopIndex) => {
+            const actualIndex = startIndex + loopIndex;
+            const extensao = ficheiro.split('.').pop().toLowerCase();
+            const caminho = `galeria/${ficheiro}`;
+            
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'gallery-item fade-in';
+            
+            if (['mp4', 'webm', 'ogg'].includes(extensao)) {
+                itemDiv.innerHTML = `
+                    <video preload="metadata">
+                        <source src="${caminho}#t=0.1" type="video/${extensao}">
+                    </video>
+                `;
+            } else {
+                itemDiv.innerHTML = `
+                    <img src="${caminho}" loading="lazy" alt="Galeria ${actualIndex + 1}" onerror="this.style.display='none'">
+                `;
+            }
+            
+            itemDiv.addEventListener('click', () => openLightbox(actualIndex));
+            
+            galleryContainer.appendChild(itemDiv);
+            observer.observe(itemDiv);
+        });
+        
+        // Atualizar os controlos de UI
+        if (pageInfo) pageInfo.textContent = `Página ${currentPage} de ${totalPages}`;
+        if (prevPageBtn) prevPageBtn.disabled = currentPage === 1;
+        if (nextPageBtn) nextPageBtn.disabled = currentPage === totalPages;
+        
+        // Voltar os novos items a ser renderizados com os ícones Lucide, caso necessário
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    };
+
+    if (itemsPerPageSelect) {
+        itemsPerPageSelect.addEventListener('change', (e) => {
+            itemsPerPage = parseInt(e.target.value);
+            currentPage = 1; // Voltar à primeira página ao mudar o limite
+            renderGallery();
+        });
+        
+        prevPageBtn.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                renderGallery();
+            }
+        });
+        
+        nextPageBtn.addEventListener('click', () => {
+            const totalPages = Math.ceil(galeriaFicheiros.length / itemsPerPage);
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderGallery();
+            }
+        });
+        
+        // Renderizar a primeira vez
+        renderGallery();
+    } else if (galleryContainer && typeof galeriaFicheiros !== 'undefined') {
+        // Fallback no caso de não existir html de paginação (por segurança)
+        renderGallery();
+    }
 });
