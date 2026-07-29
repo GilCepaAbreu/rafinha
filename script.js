@@ -169,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
             } else {
                 itemDiv.innerHTML = `
-                    <img src="${caminho}" loading="lazy" alt="Galeria ${actualIndex + 1}" onerror="this.style.display='none'">
+                    <img src="${caminho}" loading="lazy" alt="Galeria ${actualIndex + 1}" onerror="this.parentElement.style.display='none'">
                 `;
             }
             
